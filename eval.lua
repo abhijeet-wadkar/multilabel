@@ -6,7 +6,7 @@ opt = {
   dataset = 'simple',
   nClasses = 88,
   nInternalNodes = 20,
-  nThreads = 16,
+  nThreads = 1,
   batchSize = 16,
   loadSize = 256,
   fineSize = 224,
@@ -92,9 +92,13 @@ for counter=1, opt.epoch do
 
     counter = counter + opt.batchSize
 
-    print(('Testing %s: Eval [%8d / %8d]:\t Top1: %.4f  Top5: %.4f'):format(
-        opt.model, iter, maxiter,
+    print(('%s: Eval [%8d / %8d]:\t Top1: %.4f  Top5: %.4f'):format(
+        opt.models, iter, maxiter,
         top1/counter, top5/counter))
-    
   end
+
+  print(('Testing %s: Eval [%8d / %8d]:\t Top1: %.4f  Top5: %.4f'):format(
+        opt.model, maxiter, maxiter,
+        top1/counter, top5/counter))
+
 end
