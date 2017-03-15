@@ -1,0 +1,1 @@
+display_port=8004 nClasses=88 epoch=5 data_root=../ data_list=../hierarchical_leaf_node_labels/train_labels.json validation_list=../hierarchical_leaf_node_labels/validation_labels.json name=leaf_nodes th main.lua | tee leaf_nodes/train.log

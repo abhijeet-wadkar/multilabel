@@ -15,17 +15,17 @@ opt = {
   lr_decay = 30000,     -- how often to decay learning rate (in epoch's)
   beta1 = 0.9,          -- momentum term for adam
   meanIter = 0,         -- how many iterations to retrieve for mean estimation
-  saveIter = 4000,     -- write check point on this interval
-  niter = 20000,       -- number of iterations through dataset
+  epoch = 5,            -- number of iterations through dataset
   gpu = 1,              -- which GPU to use; consider using CUDA_VISIBLE_DEVICES instead
   cudnn = 1,            -- whether to use cudnn or not
   finetune = '',        -- if set, will load this network instead of starting from scratch
-  randomize = 0,        -- whether to shuffle the data file or not
+  randomize = 1,        -- whether to shuffle the data file or not
   cropping = 'random',  -- options for data augmentation
-  display_port = 8000,  -- port to push graphs
-  name = paths.basename(paths.thisfile()):sub(1,-5), -- the name of the experiment (by default, filename)
-  data_root = '/do_not_store/sunil/abhi',
-  data_list = '/do_not_store/sunil/abhi/train_labels.json',
+  display_port = 8003,  -- port to push graphs
+  name = 'allnodes', -- the name of the experiment (by default, filename)
+  data_root = '/remote_hdd3/Koni/abhi/',
+  data_list = '/remote_hdd3/Koni/abhi/hierarchical_all_node_labels/train_labels.json',
+  validation_list = '/remote_hdd3/Koni/abhi/hierarchical_all_node_labels/validation_labels.json',
   mean = {-0.083300798050439,-0.10651495109198,-0.17295466315224},
 }
 
@@ -51,8 +51,10 @@ local DataLoader = paths.dofile('data/data.lua')
 local data = DataLoader.new(opt.nThreads, opt.dataset, opt)
 print("Dataset: " .. opt.dataset, " Size: ", data:size())
 
-opt.data_list = '/do_not_store/sunil/abhi/validation_labels.json'
+opt.data_list = opt.validation_list
 local validation_data = DataLoader.new(opt.nThreads, opt.dataset, opt)
+
+print('python gen_plots.py train.log '.. data:size() .. ' '.. validation_data:size() .. ' ' .. opt.batchSize .. ' ' .. opt.name)
 
 -- define the model
 local net
@@ -180,7 +182,7 @@ local optimState = {
 }
 
 function validation(model,loader)
-    num_batches_val = math.floor(loader:size()/opt.batchSize)
+    local num_batches_val = math.floor(loader:size()/opt.batchSize)
     for counter=1,num_batches_val do
         tm:reset()
         -- fetch data
@@ -203,8 +205,10 @@ end
 total_time:reset()
 print('Starting Optimization...')
 
+local num_batches = math.floor(data:size()/opt.batchSize)
+
 -- train main loop
-for counter = 1,opt.niter do
+for counter = 1, opt.epoch*num_batches do
   collectgarbage() -- necessary sometimes
   
   tm:reset()
@@ -226,19 +230,18 @@ for counter = 1,opt.niter do
   end
   
   print(('Training %s %s Iter: [%7d / %7d]  Time: %.3f  DataTime: %.3f  Err: %.4f'):format(
-          opt.name, opt.hostname, counter, opt.niter, tm:time().real, data_tm:time().real,
+          opt.name, opt.hostname, counter, opt.epoch*num_batches, tm:time().real, data_tm:time().real,
           err))
 
   -- save checkpoint
   -- :clearState() compacts the model so it takes less space on disk
-  if counter % opt.saveIter == 0 then
+  if counter % num_batches == 0 then
     validation(net, validation_data)
-    print('Saving ' .. opt.name .. '/iter' .. counter .. '_net.t7')
-    paths.mkdir('checkpoints')
-    paths.mkdir('checkpoints/' .. opt.name)
-    torch.save('checkpoints/' .. opt.name .. '/iter' .. counter .. '_net.t7', net:clearState())
-    --torch.save('checkpoints/' .. opt.name .. '/iter' .. counter .. '_optim.t7', optimState)
-    torch.save('checkpoints/' .. opt.name .. '/iter' .. counter .. '_history.t7', history)
+    print('Saving ' .. opt.name .. '/iter' .. math.floor(counter/num_batches) .. '_net.t7')
+    path.mkdir(opt.name)
+    paths.mkdir(opt.name .. '/checkpoints')
+    torch.save(opt.name .. '/checkpoints/iter' .. math.floor(counter/num_batches) .. '_net.t7', net:clearState())
+    torch.save(opt.name .. '/checkpoints/iter' .. math.floor(counter/num_batches) .. '_history.t7', history)
   end
 
   -- decay the learning rate, if requested
@@ -254,12 +257,4 @@ for counter = 1,opt.niter do
   end
 end
 
--- saving the last modules
-print('Saving ' .. opt.name .. '/iter_final_net.t7')
-paths.mkdir('checkpoints')
-paths.mkdir('checkpoints/' .. opt.name)
-torch.save('checkpoints/' .. opt.name .. '/iter_final_net.t7', net:clearState())
---torch.save('checkpoints/' .. opt.name .. '/iter' .. counter .. '_optim.t7', optimState)
-torch.save('checkpoints/' .. opt.name .. '/iter_final_history.t7', history)
-
-print(('Total traning time %.3f'):format(total_time:time().real))
+print(('Total traning time %.3f'):format((total_time:time().real/60)))
